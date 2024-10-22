@@ -7,8 +7,9 @@ seabreeze.use('cseabreeze')
 
 
 class OceanOpticsSpectrometer(Spectrometer):
-    def __init__(self, spectrometer: ooSpec):
-        self.spectrometer = spectrometer
+    def __init__(self, how='first'):
+        if how == 'first':
+            self.spectrometer = ooSpec.from_first_available()
 
     def intensities(self):
         return self.spectrometer.intensities()

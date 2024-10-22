@@ -2,6 +2,7 @@ from .linear_motor import LinearMotor, StageOutOfBoundsException, StageNotCalibr
 
 from pylablib.devices.Thorlabs import KinesisMotor
 from pylablib.devices.Thorlabs.base import ThorlabsError
+from pylablib.devices.Thorlabs.kinesis import list_kinesis_devices
 
 '''
 Class for all Thorlabs linear motors which 
@@ -14,8 +15,10 @@ class ThorlabsKinesisMotor(LinearMotor):
     Instantiate by the serial number of the control module
     '''
 
-    def __init__(self, serial_no: int):
+    def __init__(self, how='first', serial_no=None):
         # auto-detect stage step -> distance calibration
+        if how == 'first':
+            serial_no = list_kinesis_devices()[0][0]
         self.motor = KinesisMotor(serial_no, scale="stage")
         self._position = None
         if self.motor.get_scale_units() != 'm':
