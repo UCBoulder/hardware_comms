@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 class Device(ABC):
 
-    @abstractmethod
     @property
+    @abstractmethod
     def idn(self):
         '''Returns an identifying characteristic of the device'''
         pass

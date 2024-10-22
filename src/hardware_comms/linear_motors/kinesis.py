@@ -26,6 +26,7 @@ class ThorlabsKinesisMotor(LinearMotor):
         if self.motor.get_scale_units() != 'm':
             raise StageNotCalibratedException(
                 "No step to distance calibration found. Input this manually.")
+
     @property
     def idn(self):
         return self._idn
