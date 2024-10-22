@@ -18,12 +18,17 @@ class ThorlabsKinesisMotor(LinearMotor):
     def __init__(self, how='first', serial_no=None):
         # auto-detect stage step -> distance calibration
         if how == 'first':
-            serial_no = list_kinesis_devices()[0][0]
-        self.motor = KinesisMotor(serial_no, scale="stage")
+            self._idn = list_kinesis_devices()[0][0]
+        else:
+            self._idn = serial_no
+        self.motor = KinesisMotor(self._idn, scale="stage")
         self._position = None
         if self.motor.get_scale_units() != 'm':
             raise StageNotCalibratedException(
                 "No step to distance calibration found. Input this manually.")
+    @property
+    def idn(self):
+        return self._idn
 
     @property
     def position(self):
