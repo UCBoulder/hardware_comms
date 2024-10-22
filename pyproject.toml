@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hardware_comms"
+version = "0.0.4"
+authors = [
+  { name="Mike Wahl", email="mike.wahl@colorado.edu" },
+]
+description = "Class-based implementation of lab devices"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Windows",
+    "Private :: Do Not Upload"
+]
+
+dependencies = [
+  "seabreeze",
+  "pylablib",
+  "numpy",
+  ]

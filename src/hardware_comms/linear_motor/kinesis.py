@@ -1,7 +1,8 @@
+from .linear_motor import LinearMotor, StageOutOfBoundsException, StageNotCalibratedException
+
 from pylablib.devices.Thorlabs import KinesisMotor
 from pylablib.devices.Thorlabs.base import ThorlabsError
 
-from .device_interfaces import LinearMotor, StageOutOfBoundsException, StageNotCalibratedException
 '''
 Class for all Thorlabs linear motors which 
 use the Kinesis software stack

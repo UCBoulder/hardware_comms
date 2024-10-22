@@ -1,4 +1,5 @@
-from .device_interfaces import Spectrometer, SpectrometerIntegrationException, SpectrometerAverageException
+from .spectrometer import Spectrometer,SpectrometerIntegrationException, SpectrometerAverageException
+
 from seabreeze.spectrometers import Spectrometer as ooSpec
 import seabreeze
 import numpy as np
