@@ -1,7 +1,7 @@
 import stellarnet_driver3 as sn
 
 '''
-Class is deprecated. Re-implement using the interface in device_interfaces.py
+Class is deprecated. Re-implement using the interface in spectrometer.py
 '''
 
 

@@ -1,4 +1,4 @@
-from ..device import Device
+from ..devices import Device
 
 from abc import abstractmethod
 import numpy as np
@@ -96,13 +96,6 @@ class Spectrometer(Device):
         Returns the integration time in seconds.
 
         return: listlike of (lower bound, upper bound) in seconds
-        '''
-        pass
-
-    @abstractmethod
-    def close(self) -> None:
-        '''
-        Closes the backend to avoid hanging processes.
         '''
         pass
 

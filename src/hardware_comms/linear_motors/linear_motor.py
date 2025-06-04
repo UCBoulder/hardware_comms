@@ -1,4 +1,4 @@
-from ..device import Device 
+from ..devices import Device 
 
 
 from abc import abstractmethod
