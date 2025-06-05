@@ -14,7 +14,6 @@ import pyvisa
 from ..devices import PyvisaDevice
 
 #Astrocomb imports
-# import VISAObjects as vo
 from .spectrometer import Spectrometer
 
 # %% OSA ----------------------------------------------------------------------
@@ -23,7 +22,6 @@ class YokogawaOSA(PyvisaDevice):
 #General Methods
     def __init__(self, resource_address):
         PyvisaDevice.__init__(self, resource_address)
-
         if self.resource is None:
             print('Could not create OSA instrument!')
         self.__set_command_format()
@@ -46,7 +44,6 @@ class YokogawaOSA(PyvisaDevice):
 
 #Query Methods
    
-    # @vo._auto_connect
     def sweep_parameters(self):
         """Returns sweep parameters as a dictionary
 
@@ -91,71 +88,45 @@ class YokogawaOSA(PyvisaDevice):
         t_list_values = [trace_dict, wvl_dict, level_dict]
         return {key:value for (key, value) in zip(t_list_keys, t_list_values)}
 
-    # @vo._auto_connect
-    def spectrum(self, active_trace=None):
+    def spectrum(self):
         ''' 
         Records existing OSA spectrum
 
         returns: ndarray[x bins, intensities]
         '''
-        if (active_trace!=None):
-            self.active_trace=active_trace
         y_trace = self.query_list(':TRAC:DATA:Y? {:}'.format(self.active_trace))
-        x_trace = self.query_list(':TRAC:DATA:X? {:}'.format(self.active_trace))
-        x_trace = (np.array(x_trace)*1e9).tolist()
+        x_trace = self.query_list(':TRAC:DATA:X? {:}'.format(self.active_trace))*1e9
         data = np.array([x_trace ,y_trace])
         return data
 
-    # @vo._auto_connect
-    def get_new_single(self, active_trace=None, get_parameters=False):
-    # Active Trace
-        if (active_trace!=None):
-            self.active_trace(set_trace=active_trace)
+    def get_new_single(self):
     # Prepare OSA
-        if (self.sweep_mode() != 'SING'):
-            self.sweep_mode('SING')
-        time.sleep(.05)
-        self.write(':ABORt')
-        time.sleep(.05)
-        self.write('*WAI')
-        time.sleep(.05)
-        wait_for_setup = True
-        while wait_for_setup:
-            time.sleep(.05)
-            try:
-                wait_for_setup = not(int(self.query('*OPC?').strip()))
-            except pyvisa.VisaIOError as visa_err:
-                if (visa_err.error_code == -1073807339): #timeout error
-                    pass
-                else:
-                    raise visa_err
+        self.sweep_mode='SING'
     # Initiate Sweep
-        self.write(':INITiate:IMMediate')
-        time.sleep(.05)
+        self.initiate_sweep()
+        # time.sleep(.05)
     # Wait for sweep to finish
-        wait_for_sweep = True
-        while wait_for_sweep:
-            time.sleep(.05)
-            try:
-                wait_for_sweep = not(int(self.query('*OPC?').strip()))
-            except pyvisa.VisaIOError as visa_err:
-                if (visa_err.error_code == -1073807339): #timeout error
-                    pass
-                else:
-                    raise visa_err
+        self.__wait_until_free()
     # Get Data
         data = self.spectrum()
         return data
-#    # Get Parameters
-#        if (get_parameters == True):
-#            params = self.sweep_parameters()
-#        else:
-#            params = {}
-#    # Return
-#        return {'data':data, 'params':params}
     
     def initiate_sweep(self):
         self.write(':INITiate:IMMediate')
+        self.__wait_until_free()
+    
+    def __wait_until_free(self):
+        busy = True
+        while busy:
+            time.sleep(.05)
+            try:
+                busy = not(int(self.query('*OPC?').strip().split(";")[0]))
+            except pyvisa.VisaIOError as visa_err:
+                if (visa_err.error_code == -1073807339): #timeout error
+                    pass
+                else:
+                    raise visa_err
+        
     
 #Set Methods
     # @vo._auto_connect
@@ -209,21 +180,28 @@ class YokogawaOSA(PyvisaDevice):
         '''
 
         sens = self.sens_map[int(self.query(":SENSe:SENSe?").strip())]
-        chopper = self.chop_map[int(self.query(":SENSe:CHOPper?").strip())]
-        return {'sense': sens, 'chop': chopper}
+        # chopper = self.chop_map[int(self.query(":SENSe:CHOPper?").strip())]
+        return sens
 
     @sensitivity.setter
     def sensitivity(self, set_sens):
-        if set_sens['sense'] in self.sens_map.values():
-            self.write(f":SENSe:SENSe {set_sens['sense']}")
+        if set_sens in self.sens_map.values():
+            self.write(f":SENSe:SENSe {set_sens}")
         else:
-            raise ValueError(f"Unrecognized sensitivity setting {set_sens['sense']}")
+            raise ValueError(f"Unrecognized sensitivity setting {set_sens}")
 
-        if set_sens['chop'] in self.chop_map.values(): 
-            self.write(f":SENSe:CHOPper {set_sens['chop']}")
+
+    @property 
+    def chopper_on(self):
+        chopper = self.chop_map[int(self.query(":SENSe:CHOPper?").strip())]
+    
+    @chopper_on.setter
+    def chopper_on(self, status):
+        if status in self.chop_map.values(): 
+            self.write(f":SENSe:CHOPper {status}")
         else:
-            raise ValueError(f"Unrecognized chopper setting {set_sens['chop']}")
-
+            raise ValueError(f"Unrecognized chopper setting {status}")
+        
   
     @property
     def sweep_mode(self):
@@ -244,6 +222,12 @@ class YokogawaOSA(PyvisaDevice):
     def sweep_mode(self, set_mode):
         if set_mode in self.sweep_map.values():
             self.write(f":INITiate:SMODe {set_mode}")
+            time.sleep(.05)
+            self.write(':ABORt')
+            time.sleep(.05)
+            self.write('*WAI')
+            time.sleep(.05)
+            self.__wait_until_free()
         else:
             raise ValueError(f"Unrecognized sweep mode {set_mode}")
 
@@ -258,30 +242,47 @@ class YokogawaOSA(PyvisaDevice):
         else:
             raise ValueError(f"Unrecognized trace {set_trace}") 
             
-    def set_trace_status(self, set_type, active_trace=None):
-        if (active_trace is not None):
-            self.active_trace = active_trace
-
-        if set_type['mode'] in self.trace_status_map.values():
-            self.write(f':TRACe:ATTRibute:{self.active_trace} {set_type['mode']}')
-
-            if ((set_type['mode'] == 'RAVG') and ('avg' in set_type)):
-                self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
-        else:
-            raise Exception('Unrecognized trace type {:}'.format(set_type))
             
-    def read_trace_status(self, active_trace=None):
-        if (active_trace is not None):
-            self.active_trace = active_trace
-
+    @property
+    def active_trace_status(self): 
         trace = self.query(f':TRACE:ATTRIBUTE:{self.active_trace}?').strip()
         trace = self.trace_status_map[int(trace)]
-        if (trace == 'RAVG'):
-            avg_cnt = int(self.query(':TRACe:ATTRibute:RAVG?').strip())
+        #TODO
+        # if (trace == 'RAVG'):
+        #     avg_cnt = int(self.query(':TRACe:ATTRibute:RAVG?').strip())
+        # else:
+        #     avg_cnt = 1
+        return trace
+
+    @active_trace_status.setter
+    def active_trace_status(self, set_type):
+        if set_type in self.trace_status_map.values():
+            self.write(f':TRACe:ATTRibute:{self.active_trace} {set_type}')
+
+            # TODO add averaging property
+            # if ((set_type == 'RAVG') and ('avg' in set_type)):
+                # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
         else:
-            avg_cnt = 1
-        return {'mode':trace, 'avg':avg_cnt}
+            raise Exception(f'Unrecognized trace type {set_type}')
     
+    def read_trace_status(self, trace):
+        status = self.query(f':TRACE:ATTRIBUTE:{trace}?').strip()
+        status = self.trace_status_map[int(status)]
+        # TODO
+        # if (status == 'RAVG'):
+        #     avg_cnt = int(self.query(':TRACe:ATTRibute:RAVG?').strip())
+        # else:
+        #     avg_cnt = 1
+        return status
+
+    def set_trace_status(self, trace, status):
+        if status in self.trace_status_map.values():
+            self.write(f':TRACe:ATTRibute:{trace} {status}')
+            # TODO add averaging property
+            # if ((set_type == 'RAVG') and ('avg' in set_type)):
+                # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
+        else:
+            raise Exception(f'Unrecognized trace type {status}')
 
     @property
     def level_scale(self):
@@ -295,16 +296,9 @@ class YokogawaOSA(PyvisaDevice):
         else:
             raise ValueError(f"Unrecognized level scale {set_mode}") 
     
-    # def fix_all(self, fix=None):
-    #     if (fix == None):
-    #         fixed = True
-    #         for trace in ['TRA', 'TRB', 'TRC', 'TRD', 'TRE', 'TRF', 'TRG']:
-    #             trace_type = self.trace_type(active_trace=trace)
-    #             fixed *= (trace_type['mode'] == 'FIX')
-    #         return bool(fixed)
-    #     elif (fix == True):
-    #         for trace in ['TRA', 'TRB', 'TRC', 'TRD', 'TRE', 'TRF', 'TRG']:
-    #             self.trace_type(set_type={'mode':'FIX'}, active_trace=trace)
+    def fix_all(self):
+        for trace in self.trace_map.values():
+            self.set_trace_status(trace, "FIX")
     
     # @vo._auto_connect
     def __set_command_format(self):

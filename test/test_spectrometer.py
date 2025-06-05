@@ -3,12 +3,14 @@ import matplotlib.pyplot as plt
 spec = YokogawaOSA("Yokogawa")
 
 spec.active_trace = "TRG"
-spec.set_trace_status({'mode': "WRITE"})
+spec.active_trace_status= "WRITE"
+spec.resolution = 1
+
 print(spec.sweep_parameters())
-print(spec.read_trace_status())
-# data = spec.spectrum()
+spec.get_new_single()
+data = spec.spectrum()
 # print(data[0])
-# print(data[1])
+print(data[1])
 # f, ax = plt.subplots(1,1)
 # ax.plot(data[0],data[1])
 # plt.show()
