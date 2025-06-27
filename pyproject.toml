@@ -22,4 +22,5 @@ dependencies = [
   "seabreeze",
   "pylablib",
   "numpy",
+  "pyvisa"
   ]

@@ -8,7 +8,7 @@ class Device(ABC):
 
     @property
     @abstractmethod
-    def idn(self):
+    def idn(self) -> str:
         '''Returns an identifying characteristic of the device'''
         pass
 
@@ -22,6 +22,7 @@ class PyvisaDevice(Device):
     def __init__(self, resource_address):
         self.resource: MessageBasedResource = ResourceManager().open_resource(resource_address)
     
+    @property 
     def idn(self):
         return self.query("*IDN?")
 
@@ -35,7 +36,7 @@ class PyvisaDevice(Device):
     def read(self) -> str:
         return self.resource.read()
 
-    def write(self, message) -> str:
+    def write(self, message):
         self.resource.write(message) 
 
     def close(self):

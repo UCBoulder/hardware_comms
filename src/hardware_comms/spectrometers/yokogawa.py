@@ -8,25 +8,28 @@ Created on Tue Jun 20 07:26:32 2017
 
 import time
 
-#3rd party imports
+# 3rd party imports
 import numpy as np
 import pyvisa
 from ..devices import PyvisaDevice
 
-#Astrocomb imports
+# Astrocomb imports
 from .spectrometer import Spectrometer
 
 # %% OSA ----------------------------------------------------------------------
+
+
 class YokogawaOSA(PyvisaDevice):
     """Holds Yokogawa OSA's attributes and method library."""
-#General Methods
+# General Methods
+
     def __init__(self, resource_address):
         PyvisaDevice.__init__(self, resource_address)
         if self.resource is None:
             print('Could not create OSA instrument!')
         self.__set_command_format()
         self.set_maps()
-    
+
     # @vo._auto_connect
     def reset(self):
         """Stops current machine operation and returns OSA to default values"""
@@ -34,16 +37,21 @@ class YokogawaOSA(PyvisaDevice):
         self.__set_command_format()
 
     def set_maps(self):
-        self.trace_status_map = {0:"WRITE", 1:"FIX", 2:"MAX HOLD", 3:"MIN HOLD", 4:"ROLL AVG", 5:"CALC"}
-        self.sens_map = {0:'NHLD', 1:'NAUT', 2:'MID', 3:'HIGH1', 4:'HIGH2', 5:'HIGH3', 6:'NORM'}
-        self.chop_map = {0:'OFF', 2:'SWITCH'}
-        self.sweep_map = {1:'SING', 2:'REP', 3:'AUTO', 4:'SEGM'}
-        self.trace_map = {0:'TRA', 1:'TRB', 2:'TRC', 3:'TRD', 4:'TRE', 5:'TRF', 6:'TRG'}
+        self.trace_status_map = {
+            0: "WRITE", 1: "FIX", 2: "MAX HOLD", 3: "MIN HOLD", 4: "ROLL AVG", 5: "CALC"}
+        self.sens_map = {0: 'NHLD', 1: 'NAUT', 2: 'MID',
+                         3: 'HIGH1', 4: 'HIGH2', 5: 'HIGH3', 6: 'NORM'}
+        self.chop_map = {0: 'OFF', 2: 'SWITCH'}
+        self.sweep_map = {1: 'SING', 2: 'REP', 3: 'AUTO', 4: 'SEGM'}
+        self.trace_map = {0: 'TRA', 1: 'TRB', 2: 'TRC',
+                          3: 'TRD', 4: 'TRE', 5: 'TRF', 6: 'TRG'}
         self.scale_map = {0: 'LOG', 1: 'LIN'}
-        
+        self.unit_map = {0: 'dBm', 1: 'W', 2: 'dBm/nm', 3: 'W/nm'}
 
-#Query Methods
-   
+
+# Query Methods
+
+
     def sweep_parameters(self):
         """Returns sweep parameters as a dictionary
 
@@ -55,38 +63,32 @@ class YokogawaOSA(PyvisaDevice):
         Normal Hold | Normal Auto | Normal | Mid | High 1 | High 2 | High 3 |
         """
         # Active Trace and Mode
-        trace = self.query(":TRACe:ACTive?").strip()
-        mode = self.query(':TRACe:ATTRibute:{:}?'.format(trace)).strip()
-        mode = self.trace_status_map[int(mode)]
-        avg_cnt = int(self.query(":TRACe:ATTRibute:RAVG?").strip())
-        if (mode in ["WRITE", "FIX", "MAX HOLD", "MIN HOLD", "CALC"]):
+        mode = self.active_trace_status
+        if (mode == "ROLL AVG"):
+            avg_cnt = self.naverages
+        else:
             avg_cnt = 1
         t_list_keys = ["active_trace", "trace_mode", "avg_count"]
-        t_list_values = [trace, mode, avg_cnt]
-        trace_dict = {key:value for (key, value) in zip(t_list_keys, t_list_values)}
+        t_list_values = [self.active_trace, mode, avg_cnt]
+        trace_dict = {key: value for (key, value) in zip(
+            t_list_keys, t_list_values)}
+
         # Wavelength
-        start_wvl = float(self.query(":SENSe:WAVelength:STARt?").strip())*1e9
-        stop_wvl = float(self.query(":SENSe:WAVelength:STOP?").strip())*1e9
-        wvl_res = float(self.query(":SENSe:BANDwidth:RESolution?").strip())*1e9
-        samp_cnt = int(self.query(":SENSe:SWEep:POINts?").strip())
+        start_wvl,stop_wvl = self.wavelength_span
         t_list_keys = ["start", "stop", "resolution", "points"]
-        t_list_values = [start_wvl, stop_wvl, wvl_res, samp_cnt]
-        wvl_dict = {key:value for (key, value) in zip(t_list_keys, t_list_values)}
+        t_list_values = [start_wvl, stop_wvl, self.resolution, self.npoints]
+        wvl_dict = {key: value for (key, value) in zip(
+            t_list_keys, t_list_values)}
+
         # Level
-        ref_lvl = self.query(":DISPlay:WINDow:TRACe:Y1:SCALe:RLEVel?").strip()
-        level_unit = self.query(":DISPlay:WINDow:TRACe:Y1:SCALe:UNIT?").strip()
-        level_unit = {0:'dBm',1:'W',2:'dBm',3:'W'}[int(level_unit)]
-        sens = self.query(":SENSe:SENSe?").strip()
-        sens = {0:'NORMAL HOLD',1:'NORMAL AUTO',2:'MID',3:'HIGH1',4:'HIGH2',5:'HIGH3',6:'NORMAL'}[int(sens)]
-        chopper = self.query(":SENSe:CHOPper?").strip()
-        chopper = {0:'OFF',2:'SWITCH'}[int(chopper)]
         t_list_keys = ["ref_level", "level_unit", "sensitivity", "chopper"]
-        t_list_values = [ref_lvl, level_unit, sens, chopper]
-        level_dict = {key:value for (key, value) in zip(t_list_keys, t_list_values)}
+        t_list_values = [self.reference_level, self.yunits, self.sensitivity, self.chopper]
+        level_dict = {key: value for (key, value) in zip(
+            t_list_keys, t_list_values)}
         # Return Values
-        t_list_keys = ['trace','wavelength','level']
+        t_list_keys = ['trace', 'wavelength', 'level']
         t_list_values = [trace_dict, wvl_dict, level_dict]
-        return {key:value for (key, value) in zip(t_list_keys, t_list_values)}
+        return {key: value for (key, value) in zip(t_list_keys, t_list_values)}
 
     def spectrum(self):
         ''' 
@@ -94,14 +96,16 @@ class YokogawaOSA(PyvisaDevice):
 
         returns: ndarray[x bins, intensities]
         '''
-        y_trace = self.query_list(':TRAC:DATA:Y? {:}'.format(self.active_trace))
-        x_trace = self.query_list(':TRAC:DATA:X? {:}'.format(self.active_trace))*1e9
-        data = np.array([x_trace ,y_trace])
+        y_trace = self.query_list(
+            ':TRAC:DATA:Y? {:}'.format(self.active_trace))
+        x_trace = self.query_list(
+            ':TRAC:DATA:X? {:}'.format(self.active_trace))*1e9
+        data = np.array([x_trace, y_trace])
         return data
 
     def get_new_single(self):
-    # Prepare OSA
-        self.sweep_mode='SING'
+        # Prepare OSA
+        self.sweep_mode = 'SING'
     # Initiate Sweep
         self.initiate_sweep()
         # time.sleep(.05)
@@ -110,31 +114,55 @@ class YokogawaOSA(PyvisaDevice):
     # Get Data
         data = self.spectrum()
         return data
-    
+
     def initiate_sweep(self):
         self.write(':INITiate:IMMediate')
         self.__wait_until_free()
-    
+
     def __wait_until_free(self):
         busy = True
         while busy:
             time.sleep(.05)
             try:
-                busy = not(int(self.query('*OPC?').strip().split(";")[0]))
+                busy = not (int(self.query('*OPC?').strip().split(";")[0]))
             except pyvisa.VisaIOError as visa_err:
-                if (visa_err.error_code == -1073807339): #timeout error
+                if (visa_err.error_code == -1073807339):  # timeout error
                     pass
                 else:
                     raise visa_err
+
+
+# Set Methods
+
+    @property
+    def yunits(self) -> str:
+        level_unit = self.query(":DISPlay:WINDow:TRACe:Y1:SCALe:UNIT?").strip()
+        return self.unit_map[int(level_unit)]
         
+
+    @property 
+    def npoints(self) -> int:
+        return int(self.query(":SENSe:SWEep:POINts?").strip())
     
-#Set Methods
-    # @vo._auto_connect
+    @property
+    def naverages(self) -> int:
+        return int(self.query(":TRACe:ATTRibute:RAVG?").strip())
+    
+    @property
+    def reference_level(self) -> float:
+        return float(self.query(":DISPlay:WINDow:TRACe:Y1:SCALe:RLEVel?").strip())
+    
+    @property 
+    def chopper(self) -> str:
+        chopper = self.query(":SENSe:CHOPper?").strip()
+        return self.chop_map[int(chopper)]
+        
+        
     @property
     def wavelength_span(self) -> tuple:
         '''
         Reads the current wavelength span in nanometers.
-        
+
         returns: tuple of (start, end)
         '''
         start_wvl = float(self.query(":SENSe:WAVelength:STARt?").strip())*1e9
@@ -145,17 +173,18 @@ class YokogawaOSA(PyvisaDevice):
     def wavelength_span(self, range: tuple):
         '''
         Sets the wavelength span in nanometers
-        
+
         range: tuple of (start, end)
         '''
-        cmd_str = "SENSe:WAVelength:STARt {:}NM; STOP {:}NM".format(range[0],range[1])
+        cmd_str = "SENSe:WAVelength:STARt {:}NM; STOP {:}NM".format(
+            range[0], range[1])
         self.write(cmd_str)
-        
+
     @property
     def resolution(self):
         '''
         Returns the current resolution in nanometers.
-        
+
         2NM, 1NM, 0.5NM, 0.2NM, 0.1NM, 0.05NM, 0.02NM
         '''
         res = float(self.query(':SENSE:BANDWIDTH?').strip()) * 1e9
@@ -164,12 +193,12 @@ class YokogawaOSA(PyvisaDevice):
     @resolution.setter
     def resolution(self, set_res):
         self.write(f':SENSE:BANDWIDTH:RESOLUTION {set_res:.2f}NM')
-    
+
     @property
     def sensitivity(self):
         '''
         set_sens={'sense':<sensitivity>, 'chop':<chopper action>}
-        
+
         NHLD = NORMAL HOLD
         NAUT = NORMAL AUTO
         NORM = NORMAL
@@ -190,19 +219,17 @@ class YokogawaOSA(PyvisaDevice):
         else:
             raise ValueError(f"Unrecognized sensitivity setting {set_sens}")
 
-
-    @property 
+    @property
     def chopper_on(self):
         chopper = self.chop_map[int(self.query(":SENSe:CHOPper?").strip())]
-    
+
     @chopper_on.setter
     def chopper_on(self, status):
-        if status in self.chop_map.values(): 
+        if status in self.chop_map.values():
             self.write(f":SENSe:CHOPper {status}")
         else:
             raise ValueError(f"Unrecognized chopper setting {status}")
-        
-  
+
     @property
     def sweep_mode(self):
         '''
@@ -240,14 +267,13 @@ class YokogawaOSA(PyvisaDevice):
         if set_trace in self.trace_map.values():
             self.write(f':TRACE:ACTIVE {set_trace}')
         else:
-            raise ValueError(f"Unrecognized trace {set_trace}") 
-            
-            
+            raise ValueError(f"Unrecognized trace {set_trace}")
+
     @property
-    def active_trace_status(self): 
+    def active_trace_status(self):
         trace = self.query(f':TRACE:ATTRIBUTE:{self.active_trace}?').strip()
         trace = self.trace_status_map[int(trace)]
-        #TODO
+        # TODO
         # if (trace == 'RAVG'):
         #     avg_cnt = int(self.query(':TRACe:ATTRibute:RAVG?').strip())
         # else:
@@ -261,10 +287,10 @@ class YokogawaOSA(PyvisaDevice):
 
             # TODO add averaging property
             # if ((set_type == 'RAVG') and ('avg' in set_type)):
-                # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
+            # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
         else:
             raise Exception(f'Unrecognized trace type {set_type}')
-    
+
     def read_trace_status(self, trace):
         status = self.query(f':TRACE:ATTRIBUTE:{trace}?').strip()
         status = self.trace_status_map[int(status)]
@@ -280,7 +306,7 @@ class YokogawaOSA(PyvisaDevice):
             self.write(f':TRACe:ATTRibute:{trace} {status}')
             # TODO add averaging property
             # if ((set_type == 'RAVG') and ('avg' in set_type)):
-                # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
+            # self.write(f':TRACe:ATTRibute:RAVG {int(set_type['avg'])}')
         else:
             raise Exception(f'Unrecognized trace type {status}')
 
@@ -294,13 +320,18 @@ class YokogawaOSA(PyvisaDevice):
         if set_mode in self.scale_map.values():
             self.write(f':DISPLAY:TRACE:Y1:SPACING {set_mode}')
         else:
-            raise ValueError(f"Unrecognized level scale {set_mode}") 
-    
+            raise ValueError(f"Unrecognized level scale {set_mode}")
+
     def fix_all(self):
         for trace in self.trace_map.values():
             self.set_trace_status(trace, "FIX")
-    
+
     # @vo._auto_connect
     def __set_command_format(self):
         """Sets the OSA's formatting to AQ6370 style, should always be 1"""
         self.write('CFORM1')
+
+class YokogawaAQ6375E(YokogawaOSA):
+    @property
+    def chopper(self):
+        return "OFF"
