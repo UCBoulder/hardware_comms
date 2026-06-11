@@ -128,6 +128,8 @@ class YokogawaOSA(PyvisaDevice):
             except pyvisa.VisaIOError as visa_err:
                 if (visa_err.error_code == -1073807339):  # timeout error
                     pass
+                elif(visa_err.error_code == -1073807298): # i/o error
+                    pass
                 else:
                     raise visa_err
 
